@@ -1,0 +1,1831 @@
+#include <iostream>
+#include <cmath>
+#include <vector>
+#include <conio.h>
+
+using namespace std;
+
+
+float Function(float x)
+{
+    //return x*x+(2+8)*x+(2*8);
+    //return (-1)*((8*x)-(0.1*pow(x,4))/(1.1-sin(x)));
+    //return 10*x*log(x+3);
+    return pow((0.8-(62.5/(12.5+7.5*x))), 2);
+}
+
+struct Segment
+{
+    float a, b;
+    Segment(float a0 = 0, float b0 = 0)
+    {
+        a = a0;
+        b = b0;
+    }
+};
+struct Function_point
+{
+    float x, y;
+    Function_point(float x0)
+    {
+        x = x0;
+        y = Function(x0);
+    }
+    Function_point(float x0, float y0)
+    {
+        x = x0;
+        y = y0;
+    }
+};
+
+Function_point GSMethod(Segment target_segment)
+{
+    float a0 = target_segment.a, b0 = target_segment.b, acc;
+
+    acc = 0.001;
+
+    float t2 = 2 / (1 + sqrt(5.0));
+    float t1 = 1 - t2;
+    float x1, x2, length, result_arg, result_value;
+    int counter = 0;
+
+    length = b0 - a0;
+    x1 = a0 + t1 * length;
+    x2 = a0 + t2 * length;
+    do
+    {
+        counter++;
+        if (Function(x1) < Function(x2))
+        {
+            b0 = x2;
+            length = b0 - a0;
+            x2 = x1;
+            x1 = a0 + t1 * length;
+        }
+        else
+        {
+            a0 = x1;
+            length = b0 - a0;
+            x1 = x2;
+            x2 = a0 + t2 * length;
+        }
+        //cout << counter << "  " << a0 << "  " << b0 << "  " << length << endl;
+    } while (length >= acc);
+    cout << "GS Method: " << counter << " iterations" << endl;
+
+    result_arg = (Function(a0) < Function(b0)) ? a0 : b0;
+    result_value = (Function(a0) < Function(b0)) ? Function(a0) : Function(b0);
+    //cout << endl << "Minimum of the function = " << result_value << " with argument = " << result_arg << endl;
+
+    return Function_point(result_arg, result_value);
+}
+Segment DSKAlgorithm(float x0, float h)
+{
+    h = fabs(h);
+    Function_point fp_x0(x0), fp_l(x0-h), fp_r(x0+h);
+    if (fp_l.y <= fp_x0.y && fp_x0.y <= fp_r.y)
+        h *= -1;
+    else if (fp_l.y >= fp_x0.y && fp_x0.y >= fp_r.y) {}
+    else if (fp_l.y >= fp_x0.y && fp_x0.y <= fp_r.y)
+        return Segment(fp_l.x, fp_r.x);
+    else
+    {
+        cout << "Error: Function on this segment isn't unimodal (try to change h)" << endl;
+        return Segment();
+    }
+
+    int k = 0;
+    vector <Function_point> fp_last_arr;
+    fp_last_arr.push_back(fp_x0);
+    do
+    {
+        //getch();
+        fp_last_arr.push_back(Function_point(fp_last_arr[k].x + (h * pow(2, k))));
+        k++;
+        //cout << fp_last_arr[k].x << " " << fp_last_arr[k].y << endl;
+    } while (fp_last_arr[k].y <= fp_last_arr[k-1].y);
+    cout << "DSK Algorithm: " << k+1 << " iterations" << endl;
+
+    if (k == 1)
+        return Segment(fp_last_arr[k].x, fp_last_arr[k-1].x);
+    else
+    {
+        Function_point fp_last_middle((fp_last_arr[k].x+fp_last_arr[k-1].x) / 2);
+        if (fp_last_middle.y > fp_last_arr[k-1].y)
+            return Segment(fp_last_middle.x, fp_last_arr[k-2].x);
+        else if (fp_last_middle.y < fp_last_arr[k-1].y)
+            return Segment(fp_last_arr[k].x, fp_last_arr[k-1].x);
+        else
+            return Segment(fp_last_middle.x, fp_last_arr[k-1].x);
+    }
+}
+int main()
+{
+    cout << endl;
+    Segment target_segment;
+    target_segment.a = 0;
+    target_segment.b = 20;
+    cout << "GS Method: a0 = " << target_segment.a << ", b0 = " << target_segment.b << endl;
+    Function_point result_fp = GSMethod(target_segment);
+    cout << "GS Method: minimum: " << result_fp.x << ", " << result_fp.y << endl << endl;
+
+    float x0 = 10;
+    float h = 1;
+    cout << "DSK Algorithm: x0 = " << x0 << ", h = " << h << endl;
+    Segment uncert_interval = DSKAlgorithm(x0, h);
+    cout << "DSK Algorithm: interval " << uncert_interval.a << ", " << uncert_interval.b << endl;
+
+    result_fp = GSMethod(uncert_interval);
+    cout << "GS Method: minimum: " << result_fp.x << ", " << result_fp.y << endl << endl;
+
+
+    return 0;
+}
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <unordered_map>
+#include <algorithm>
+
+#define message_classes_amount 3
+
+using namespace std;
+
+struct Message_class {
+    string name;
+    double probability;
+};
+struct Message {
+    vector <string> words;
+    unsigned char class_id;
+
+    void addWord(string word) {
+        word.erase(remove_if(word.begin(), word.end(), [] (char c) {
+            return c == ',' || c == '.' || c == '?' || c == '!';
+        }), word.end());
+        transform(word.begin(), word.end(), word.begin(), ::tolower);
+
+        words.push_back(word);
+    }
+};
+struct Dictionary_word {
+    vector <int> amount;
+    vector <double> probability_norm;
+};
+
+int main()
+{
+    vector <Message_class> message_classes = {
+        {"STORY", 1.0 / message_classes_amount},
+        {"SPAM", 1.0 / message_classes_amount},
+        {"CODE", 1.0 / message_classes_amount}
+    };
+
+    vector <Message> input_messages;
+    for (int i = 0; i < message_classes_amount; i++) {
+        ifstream this_class_input_file("dataset/" + message_classes[i].name + ".txt");
+
+        Message this_message;
+        this_message.class_id = i;
+        int this_message_size_begin = this_message.words.size();
+        for (string word; this_class_input_file >> word; ) {
+            this_message.addWord(word);
+        }
+        input_messages.push_back(this_message);
+
+        cout << this_message.words.size() - this_message_size_begin << " words from " << message_classes[i].name << " were analyzed" << endl;
+    }
+
+    unordered_map <string, Dictionary_word> dictionary;
+    for (auto &input_message : input_messages) {
+        for (auto &word : input_message.words) {
+            Dictionary_word dictionary_word;
+            dictionary_word.amount.resize(message_classes.size());
+            dictionary_word.probability_norm.resize(message_classes.size());
+            dictionary_word.amount[input_message.class_id] = 0;
+
+            auto this_word_status = dictionary.insert({word, dictionary_word});
+            auto this_word_in_dictionary = this_word_status.first;
+            this_word_in_dictionary->second.amount[input_message.class_id] += 1;
+        }
+    }
+    cout << endl << "Dictionary with " << dictionary.size() << " words has been created" << endl;
+
+    for (auto &word : dictionary) {
+        double word_total_amount = 0;
+        for (auto &n : word.second.amount)
+            word_total_amount += n;
+        for (int i = 0; i < message_classes_amount; i++) {
+            word.second.probability_norm[i] = (word.second.amount[i] + message_classes[i].probability) / (word_total_amount + 1.0);
+        }
+        //cout << word.first << " " << word.second.probability_norm[0] << " " << word.second.probability_norm[1] << " " << word.second.probability_norm[2] << endl;
+    }
+    cout << "Classifier was taught" << endl;
+
+    cout << endl << "Test message: " << endl;
+    ifstream input_test("test.txt");
+    string test_message_string;
+    getline(input_test, test_message_string);
+    cout << test_message_string << endl;
+    istringstream iss(test_message_string);
+    Message test_message;
+    for (string word; iss >> word; ) {
+        test_message.addWord(word);
+    }
+    vector <double> test_message_classes_probability (message_classes_amount);
+    for (int i = 0; i < message_classes_amount; i++) {
+        test_message_classes_probability[i] = message_classes[i].probability;
+    }
+    for (auto &word : test_message.words) {
+        auto this_word_in_dictionary = dictionary.find(word);
+        vector <double> this_word_probability_norm (message_classes_amount);
+        if (this_word_in_dictionary == dictionary.end())
+            fill(this_word_probability_norm.begin(), this_word_probability_norm.end(), 1.0 / message_classes_amount);
+        else
+            this_word_probability_norm = this_word_in_dictionary->second.probability_norm;
+
+        for (int i = 0; i < message_classes_amount; i++) {
+            test_message_classes_probability[i] *= this_word_probability_norm[i];
+        }
+    }
+    cout << "Message analyzing has finished" << endl;
+
+    cout << endl << "Classes probabilities: " << fixed << setprecision(18) << endl;
+    for (int i = 0; i < message_classes_amount; i++) {
+        cout << "P(" << message_classes[i].name << ") " << setw(13 - message_classes[i].name.length()) << "= " << test_message_classes_probability[i] << endl;
+    }
+    int max_probability_index = max_element(test_message_classes_probability.begin(), test_message_classes_probability.end()) - test_message_classes_probability.begin();
+    cout << endl << "Test message is " << message_classes[max_probability_index].name << endl;
+
+    return 0;
+}
+#include "Matrix.h"
+
+using namespace std;
+
+Matrix::Matrix(int n_arg) {
+    cores_amount = thread::hardware_concurrency();
+    cout << "Machine has " << cores_amount << " cores (threads)" << endl;
+
+    n = n_arg;
+    matr = setRandomMatrix();
+}
+Matrix::~Matrix() {
+
+}
+int** Matrix::setRandomMatrix(int columns) {
+    columns = (columns == 0 ? n : columns);
+
+    int** matrix = new int* [n];
+    for (int i = 0; i < n; i++) {
+        matrix[i] = new int [columns];
+    }
+
+    srand(time(NULL));
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < columns; j++) {
+            matrix[i][j] = rand() % 9 + 1;
+        }
+    }
+    return matrix;
+}
+int* Matrix::setRandomVector() {
+    int** vector_matrix_form = setRandomMatrix(1);
+    int* vector_v = new int [n];
+    for (int i = 0; i < n; i++) {
+        vector_v[i] = vector_matrix_form[i][0];
+    }
+    return vector_v;
+}
+void Matrix::printMatrix(int** m, int columns) {
+    if (!m)
+        m = matr;
+    for (int i = 0; i < n; i++) {
+        if (columns == 1) {
+            cout << (*m)[i] << " ";
+        }
+        else {
+            for (int j = 0; j < n; j++) {
+                cout << m[i][j] << " ";
+            }
+            cout << endl;
+        }
+    }
+    cout << endl;
+}
+
+int* Matrix::multiplyByVector(int* vec_multip, int threads_a) {
+    threads_amount = (threads_a == 0 ? cores_amount : threads_a);
+
+    int* vec_result = new int [n];
+
+    thread* threads_arr = new thread[threads_amount];
+    for (int i = 0; i < threads_amount; i++) {
+        threads_arr[i] = thread(multiplyCalc, this, vec_multip, vec_result, i);
+    }
+    for (int i = 0; i < threads_amount; i++) {
+        threads_arr[i].join();
+    }
+
+    delete [] threads_arr;
+    return vec_result;
+}
+void Matrix::multiplyCalc(int* vec_multip, int* vec_result, int iteration) {
+    int rows_amount = n / threads_amount;
+    int first_row = iteration * rows_amount;
+    int last_row = (iteration + 1) * rows_amount;
+    if (iteration + 1 == threads_amount) {
+        last_row += n % threads_amount;
+    }
+
+    for (int i = first_row; i < last_row; i++) {
+        vec_result[i] = 0;
+        for (int j = 0; j < n; j++) {
+            vec_result[i] += matr[i][j] * vec_multip[j];
+        }
+    }
+}
+
+#include "Matrix.h"
+
+using namespace std;
+
+Matrix::Matrix(int n_arg) {
+    cores_amount = thread::hardware_concurrency();
+    cout << "Machine has " << cores_amount << " cores (threads)" << endl;
+
+    n = n_arg;
+    matr = setRandomMatrix();
+}
+Matrix::~Matrix() {
+
+}
+int** Matrix::setRandomMatrix(int columns) {
+    columns = (columns == 0 ? n : columns);
+
+    int** matrix = new int* [n];
+    for (int i = 0; i < n; i++) {
+        matrix[i] = new int [columns];
+    }
+
+    srand(time(NULL));
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < columns; j++) {
+            matrix[i][j] = rand() % 9 + 1;
+        }
+    }
+    return matrix;
+}
+int* Matrix::setRandomVector() {
+    int** vector_matrix_form = setRandomMatrix(1);
+    int* vector_v = new int [n];
+    for (int i = 0; i < n; i++) {
+        vector_v[i] = vector_matrix_form[i][0];
+    }
+    return vector_v;
+}
+void Matrix::printMatrix(int** m, int columns) {
+    if (!m)
+        m = matr;
+    for (int i = 0; i < n; i++) {
+        if (columns == 1) {
+            cout << (*m)[i] << " ";
+        }
+        else {
+            for (int j = 0; j < n; j++) {
+                cout << m[i][j] << " ";
+            }
+            cout << endl;
+        }
+    }
+    cout << endl;
+}
+
+int* Matrix::multiplyByVector(int* vec_multip, int threads_a) {
+    threads_amount = (threads_a == 0 ? cores_amount : threads_a);
+
+    int* vec_result = new int [n];
+
+    thread* threads_arr = new thread[threads_amount];
+    for (int i = 0; i < threads_amount; i++) {
+        threads_arr[i] = thread(multiplyCalc, this, vec_multip, vec_result, i);
+    }
+    for (int i = 0; i < threads_amount; i++) {
+        threads_arr[i].join();
+    }
+
+    delete [] threads_arr;
+    return vec_result;
+}
+void Matrix::multiplyCalc(int* vec_multip, int* vec_result, int iteration) {
+    int rows_amount = n / threads_amount;
+    int first_row = iteration * rows_amount;
+    int last_row = (iteration + 1) * rows_amount;
+    if (iteration + 1 == threads_amount) {
+        last_row += n % threads_amount;
+    }
+
+    for (int i = first_row; i < last_row; i++) {
+        vec_result[i] = 0;
+        for (int j = 0; j < n; j++) {
+            vec_result[i] += matr[i][j] * vec_multip[j];
+        }
+    }
+}
+
+#include "mainwindow.h"
+
+#include <QTime>
+#include <math.h>
+
+#include "QDebug"
+
+#define pi 3.141592
+
+#define amount 20
+#define length 10
+#define k 1.2//1.1+static_cast <float> (rand())/(static_cast <float> (RAND_MAX/(1.4-1.1)));
+#define noise 0
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
+{
+    points=new Point[amount];
+    f=new Field;
+
+    start();
+
+    connect(next_step_button, SIGNAL(released()), this, SLOT(nextStepButtonClicked()));
+    connect(reset_polygon_button, SIGNAL(released()), this, SLOT(resetPolygonButtonClicked()));
+    connect(change_size_in_button, SIGNAL(released()), this, SLOT(sizeChange()));
+    connect(change_size_dec_button, SIGNAL(released()), this, SLOT(sizeChange()));
+}
+
+MainWindow::~MainWindow()
+{
+    delete points;
+    delete f;
+}
+
+void MainWindow::start()
+{
+    w=new QWidget;
+    w->setGeometry(250, 30, 860, 700);
+
+    scene=new QGraphicsScene();
+    scene->setSceneRect(0, 0, 680, 680);
+
+    view=new QGraphicsView;
+    view->resize(680, 680);
+    view->centerOn(view->width()/2, view->height()/2);
+    view->setScene(scene);
+
+    next_step_button=new QPushButton("Next step");
+    next_step_button->setFixedSize(150, 50);
+
+    reset_polygon_button=new QPushButton("Reset polygon");
+    reset_polygon_button->setFixedSize(150, 50);
+
+    change_size_in_button=new QPushButton("Size increase");
+    change_size_in_button->setFixedSize(100, 100);
+    change_size_dec_button=new QPushButton("Size decrease");
+    change_size_dec_button->setFixedSize(100, 100);
+
+    QHBoxLayout* h1Layout=new QHBoxLayout;
+    h1Layout->setMargin(5);
+    h1Layout->setSpacing(10);
+
+    QVBoxLayout* h2Layout=new QVBoxLayout;
+
+    h1Layout->addWidget(view);
+
+    h2Layout->addWidget(next_step_button);
+    h2Layout->addWidget(reset_polygon_button);
+    h2Layout->addWidget(change_size_in_button);
+    h2Layout->addWidget(change_size_dec_button);
+
+    h1Layout->addLayout(h2Layout);
+    w->setLayout(h1Layout);
+
+    run();
+    w->show();
+}
+void MainWindow::run()
+{
+    QDateTime start=QDateTime::currentDateTime();
+    generatingPolygon();
+    setNewPp();
+    buildGrid();
+    QDateTime finish=QDateTime::currentDateTime();
+    int time=start.secsTo(finish);
+    //qDebug() << "Genering time: " << time;
+
+    scene->clear();
+    draw();
+    //setLabel(time);
+}
+void MainWindow::draw()
+{
+    QPen pen1(Qt::lightGray, 0.4, Qt::DashLine);
+    QPen pen2(Qt::black, 0.7);
+    QPen pen3(Qt::black, 1.2);
+    QPen pen4(Qt::green, 1);
+    QPen pen5(QColor(255, 50, 50), 1.2);
+    QPen pen6(Qt::blue, 4);
+    QPen pen7(Qt::blue, 1);
+    QPen pen8(Qt::black, 5);
+    QPen pen9(Qt::yellow, 5);
+    QBrush brush1(QColor(0, 238, 0, 20));
+
+    float maxX=points[maxXPointIndex(points)].x;
+    float maxY=points[maxYPointIndex(points)].y;
+    float minX=points[minXPointIndex(points)].x;
+    float minY=points[minYPointIndex(points)].y;
+    float newCenterX=(maxX+minX)/2, newCenterY=(maxY+minY)/2;
+    float maxSegment=maxX-minX>maxY-minY?maxX-minX:maxY-minY;
+
+    int width=scene->width(), height=scene->height();
+    float dcoord=width/(1.04*maxSegment);
+    float centerX=width/2-(dcoord*newCenterX);
+    float centerY=width/2+(dcoord*newCenterY);
+
+    float di=(dcoord>1?dcoord*20:20/dcoord);
+    for (float i=0; i<1.04*maxSegment; i+=di)
+    {
+        if (i!=0)
+            scene->addLine(-5, i*dcoord, width+5, i*dcoord, pen1);
+        scene->addLine(i*dcoord, -5, i*dcoord, height+5, pen1);
+    }
+    QPolygon pol;
+    for (int i=0; i<pp.size(); i++)
+        pol << QPoint((dcoord*pp[i].x)+centerX, -(dcoord*pp[i].y)+centerY);
+    pol << QPoint((dcoord*pp[0].x)+centerX, -(dcoord*pp[0].y)+centerY);
+
+    //scene->addPolygon(pol, pen4);
+    QPainterPath p_path;
+    p_path.addPolygon(pol);
+    scene->addPath(p_path, pen4, brush1);
+    /*for (int i=0; i<pp.size(); i++)
+        if (i!=pp.size()-1)
+            scene->addLine((dcoord*pp[i].x)+centerX, -(dcoord*pp[i].y)+centerY, (dcoord*pp[i+1].x)+centerX, -(dcoord*pp[i+1].y)+centerY, pen4);
+    */
+    for (int i=0; i<pp.size(); i++)
+        scene->addLine((dcoord*pp[i].x)+centerX, -(dcoord*pp[i].y)+centerY, (dcoord*pp[i].x)+centerX, -(dcoord*pp[i].y)+centerY, pen6);
+    for (int i=0; i<grid_path.size(); i+=2)
+        scene->addLine((dcoord*grid_path[i].x)+centerX, -(dcoord*grid_path[i].y)+centerY, (dcoord*grid_path[i+1].x)+centerX, -(dcoord*grid_path[i+1].y)+centerY, pen7);
+    for (int i=0; i<new_pp.size()-1; i++)
+        scene->addLine((dcoord*new_pp[i].x)+centerX, -(dcoord*new_pp[i].y)+centerY, (dcoord*new_pp[i+1].x)+centerX, -(dcoord*new_pp[i+1].y)+centerY, pen5);
+    scene->addLine((dcoord*new_pp[new_pp.size()-1].x)+centerX, -(dcoord*new_pp[new_pp.size()-1].y)+centerY, (dcoord*new_pp[0].x)+centerX, -(dcoord*new_pp[0].y)+centerY, pen5);
+    /*scene->addLine((dcoord*points[0].x)+centerX, -(dcoord*points[0].y)+centerY, (dcoord*points[0].x)+centerX, -(dcoord*points[0].y)+centerY, pen8);
+    scene->addLine((dcoord*points[amount-1].x)+centerX, -(dcoord*points[amount-1].y)+centerY, (dcoord*points[amount-1].x)+centerX, -(dcoord*points[amount-1].y)+centerY, pen9);*/
+}
+
+void MainWindow::generatingPolygon()
+{
+    QTime time=QTime::currentTime();
+    qsrand((uint)time.msec());
+
+    pp.clear();
+    int i=1, border=20*2, min_angle_index=-1;
+    double angle, min_angle;
+    Point* arg_points=new Point[4];
+
+    for (int j=0; j<amount; j++)
+    {
+        points[j].x=qrand()%border-(border/2);
+        points[j].y=qrand()%border-(border/2);
+    }
+    pp.push_back(points[minYPointIndex(points)]);
+    while (i<amount)
+    {
+        if (i==1)
+        {
+            arg_points[0]=pp[0];
+            arg_points[1]=Point(arg_points[0].x+1, arg_points[0].y);
+        }
+        else
+        {
+            arg_points[0]=pp[i-2];
+            arg_points[1]=pp[i-1];
+        }
+        min_angle=360;
+        for (int j=0; j<amount; j++)
+        {
+            if (i==1)
+                arg_points[2]=arg_points[0];
+            else
+                arg_points[2]=arg_points[1];
+            arg_points[3]=points[j];
+            if (arg_points[2]==arg_points[3])
+                continue;
+            angle=f->vectorsAngle(arg_points);
+            if (angle==min_angle)
+            {
+                if (f->segmentLength(arg_points[2], points[j])<f->segmentLength(arg_points[2], points[min_angle_index]))
+                {
+                    min_angle=angle;
+                    min_angle_index=j;
+                }
+            }
+            else if (angle<min_angle)
+            {
+                min_angle=angle;
+                min_angle_index=j;
+            }
+
+        }
+        if (points[min_angle_index]==pp[0])
+            break;
+        else
+            i++;
+        pp.push_back(points[min_angle_index]);
+    }
+}
+/*void MainWindow::generatingPolygon()
+{
+    QTime time=QTime::currentTime();
+    qsrand((uint)time.msec());
+
+    int i=3, border=10*2, border2, border_rand1=20, border_rand2=0;
+    int is_good=0, check1=0, check2=0, check3=0, check4=0, check5=0;
+    border_rand1=border_rand1<2?2:border_rand1;
+    border_rand2=border_rand2<3?3:border_rand2;
+    Point* arg_points=new Point[4];
+    Crossing result;
+
+    int centerx=0, centery=0;
+    for (int j=0; j<3; j++)
+    {
+        border2=qrand()%border_rand1+border_rand2;
+        points[j].x=qrand()%border-(border/2);
+        points[j].x+=centerx+(points[j].x<0?(-1*border2):border2);
+        border2=qrand()%border_rand1+border_rand2;
+        points[j].y=qrand()%border-(border/2);
+        points[j].y+=centery+(points[j].y<0?(-1*border2):border2);
+    }
+    while (i<amount)
+    {
+        border2=qrand()%border_rand1+border_rand2;
+        points[i].x=qrand()%border-(border/2);
+        //qDebug() << points[i].x;
+        points[i].x+=points[i-1].x+(points[i].x<0?(-1*border2):border2);
+        border2=qrand()%border_rand1+border_rand2;
+        points[i].y=qrand()%border-(border/2);
+        points[i].y+=points[i-1].y+(points[i].y<0?(-1*border2):border2);
+
+        arg_points[0]=points[i];
+        arg_points[1]=points[i-1];
+
+        is_good=1;
+        for (int j=i-2; j>0; j--)
+        {
+            arg_points[2]=points[j];
+            arg_points[3]=points[j-1];
+            result=f->isCrossing(arg_points);
+            if (result.points_amount || (points[i].x==0 && points[i].y==0))
+            {
+                is_good=0;
+                check1++;
+                break;
+            }
+        }
+        if (is_good)
+        {
+            if (i<amount-1)
+            {
+                i++;
+                check1=0;
+            }
+            else
+            {
+                arg_points[1]=points[0];
+                is_good=1;
+                for (int j=i-1; j>0; j--)
+                {
+                    arg_points[2]=points[j];
+                    arg_points[3]=points[j-1];
+                    result=f->isCrossing(arg_points);
+                    if (result.points_amount || (points[i].x==0 && points[i].y==0))
+                    {
+                        is_good=0;
+                        check1++;
+                        break;
+                    }
+                }
+                if (is_good)
+                    i++;
+            }
+        }
+        if (check1>20)
+        {
+            //qDebug() << "check1" << check2;
+            check2++;
+            i-=6;
+            i=(i<3)?3:i;
+            check1=0;
+        }
+        if (check2>20)
+        {
+            //qDebug() << "check2" << check3 << i;
+            check3++;
+            i-=amount/10;
+            i=(i<3)?3:i;
+            check2=0;
+        }
+        if (check3>30)
+        {
+            //qDebug() << "a quarter_____________________" << check4 << i;
+            check4++;
+            i-=amount/6;
+            i=(i<3)?3:i;
+            check3=0;
+        }
+        if (check4>2)
+        {
+            //qDebug() << "_________________a half_______" << check5 << i;
+            check5++;
+            i-=amount/2;
+            i=(i<3)?3:i;
+            check4=0;
+        }
+        if (check5>2)
+        {
+            qDebug() << "______________________________________all________________________________________________________";
+            for (int j=0; j<3; j++)
+            {
+                border2=qrand()%border_rand1+border_rand2;
+                points[j].x=qrand()%border-(border/2);
+                points[j].x+=centerx+(points[j].x<0?(-1*border2):border2);
+                centerx=points[j].x;
+                border2=qrand()%border_rand1+border_rand2;
+                points[j].y=qrand()%border-(border/2);
+                points[j].y+=centery+(points[j].y<0?(-1*border2):border2);
+                centery=points[j].y;
+            }
+            i=3;
+            check5=0;
+        }
+    }
+}*/
+void MainWindow::setNewPp()
+{
+    /*pp.clear();
+    int min_y_index=minYPointIndex(points);
+    int m_y_i_next=(min_y_index==amount-1)?0:min_y_index+1;
+    int m_y_i_prev=(min_y_index==0)?amount-1:min_y_index-1;
+    Point* arg_points=new Point[4];
+    arg_points[0]=points[min_y_index];
+    arg_points[1]=points[m_y_i_next];
+    arg_points[2]=arg_points[0];
+    arg_points[3]=points[m_y_i_prev];
+    if (f->vectorsAngle(arg_points)<=180)
+    {
+        for (int i=0; i<amount; i++)
+            pp.push_back(points[i]);
+    }
+    else
+        for (int i=amount-1; i>=0; i--)
+            pp.push_back(points[i]);*/
+
+    new_pp.clear();
+    for (int i=0; i<pp.size(); i++)
+        new_pp.push_back(pp[i]);
+    grid_path.clear();
+}
+void MainWindow::buildTriangle()
+{
+    qDebug() << new_pp.size();
+    int min_angle_index, m_a_left_index, m_a_right_index;
+    float min_angle=360, current_angle=0;
+    Point* arg_points=new Point[4];
+
+    new_pp.push_back(new_pp[0]);
+    new_pp.push_back(new_pp[1]);
+    for (int i=0; i<new_pp.size()-2; i++)
+    {
+        if (new_pp[i]==new_pp[i+1])
+        {
+            new_pp.remove(i);
+            continue;
+        }
+        arg_points[0]=new_pp[i+1];
+        arg_points[1]=new_pp[i+2];
+        arg_points[2]=arg_points[0];
+        arg_points[3]=new_pp[i];
+        current_angle=f->vectorsAngle(arg_points);
+        if (current_angle<min_angle)
+        {
+            min_angle=current_angle;
+            min_angle_index=i+1;
+        }
+    }
+    new_pp.remove(new_pp.size()-1);
+    new_pp.remove(new_pp.size()-1);
+    if (min_angle_index==new_pp.size())
+        min_angle_index=0;
+    m_a_left_index=(min_angle_index==0)?new_pp.size()-1:min_angle_index-1;
+    m_a_right_index=(min_angle_index==new_pp.size()-1)?0:min_angle_index+1;
+
+    float koef=k;
+    float l_left, l_right, y, x;
+    l_left=f->segmentLength(new_pp[min_angle_index], new_pp[m_a_left_index]);
+    l_right=f->segmentLength(new_pp[min_angle_index], new_pp[m_a_right_index]);
+    float side_length_left=(l_left<length)?l_left:length;
+    float side_length_right=(l_right<length)?l_right:length;
+    if (min(side_length_left, side_length_right)<1)
+    {
+        new_pp.remove(min_angle_index);
+        buildTriangle();
+        return;
+    }
+    else if (min(side_length_left, side_length_right)<noise)
+    {
+        koef=1.4;
+    }
+
+    if ((new_pp[m_a_left_index].y-new_pp[min_angle_index].y)!=0)
+    {
+        y=(side_length_left*(new_pp[m_a_left_index].y-new_pp[min_angle_index].y)/l_left)+new_pp[min_angle_index].y;
+        x=(y-new_pp[min_angle_index].y)*(new_pp[m_a_left_index].x-new_pp[min_angle_index].x)/(new_pp[m_a_left_index].y-new_pp[min_angle_index].y)+new_pp[min_angle_index].x;
+    }
+    else
+    {
+        x=(side_length_left*(new_pp[m_a_left_index].x-new_pp[min_angle_index].x)/l_left)+new_pp[min_angle_index].x;
+        y=(x-new_pp[min_angle_index].x)*(new_pp[m_a_left_index].y-new_pp[min_angle_index].y)/(new_pp[m_a_left_index].x-new_pp[min_angle_index].x)+new_pp[min_angle_index].y;
+    }
+    Point new_left(x, y);
+    if ((new_pp[m_a_right_index].y-new_pp[min_angle_index].y)!=0)
+    {
+        y=(side_length_right*(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)/l_right)+new_pp[min_angle_index].y;
+        x=(y-new_pp[min_angle_index].y)*(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)/(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)+new_pp[min_angle_index].x;
+    }
+    else
+    {
+        x=(side_length_right*(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)/l_right)+new_pp[min_angle_index].x;
+        y=(x-new_pp[min_angle_index].x)*(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)/(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)+new_pp[min_angle_index].y;
+    }
+    Point new_right(x, y);
+
+    if (min_angle<75)
+    {
+        grid_path.push_back(new_left);
+        grid_path.push_back(new_right);
+        new_pp.insert(min_angle_index+1, new_left);
+        new_pp.insert(min_angle_index+2, new_right);
+
+        new_pp.remove(min_angle_index);
+    }
+    else
+    {
+        if ((new_pp[m_a_right_index].y-new_pp[min_angle_index].y)!=0)
+        {
+            y=(side_length_right*(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)/l_right*koef)+new_pp[min_angle_index].y;
+            x=(y-new_pp[min_angle_index].y)*(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)/(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)+new_pp[min_angle_index].x;
+        }
+        else
+        {
+            x=(side_length_right*(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)/l_right*koef)+new_pp[min_angle_index].x;
+            y=(x-new_pp[min_angle_index].x)*(new_pp[m_a_right_index].y-new_pp[min_angle_index].y)/(new_pp[m_a_right_index].x-new_pp[min_angle_index].x)+new_pp[min_angle_index].y;
+        }
+        Point middle_right(x, y);
+
+        float mid_x=middle_right.x-new_pp[min_angle_index].x;
+        float mid_y=middle_right.y-new_pp[min_angle_index].y;
+        float ro=sqrt(mid_x*mid_x+mid_y*mid_y);
+        float fi;
+        if (mid_x==0 && mid_y==0)
+            fi=0;
+        else if (mid_x==0 && mid_y<0)
+            fi=3*pi/2;
+        else if (mid_x==0 && mid_y>0)
+            fi=pi/2;
+        else if (mid_x<0)
+            fi=atan(mid_y/mid_x)+pi;
+        else if (mid_x>0 && mid_y<0)
+            fi=atan(mid_y/mid_x)+2*pi;
+        else
+            fi=atan(mid_y/mid_x);
+
+        float half_angle=(min_angle*0.01745)/2;
+        mid_x=ro*cos(fi+half_angle);
+        mid_y=ro*sin(fi+half_angle);
+        mid_x=mid_x+new_pp[min_angle_index].x;
+        mid_y=mid_y+new_pp[min_angle_index].y;
+        Point mid_point(mid_x, mid_y);
+
+        Point arg_new_points[3]={new_pp[min_angle_index], new_left, new_right};
+        new_pp.push_back(new_pp[0]);
+        for (int j=0; j<3; j++)
+            for (int i=0; i<new_pp.size()-1; i++)
+            {
+                if ((i!=0 && new_pp[i-1]==new_pp[min_angle_index]) || new_pp[i]==new_pp[min_angle_index])
+                    break;
+                arg_points[0]=new_pp[i];
+                arg_points[1]=new_pp[i+1];
+                arg_points[2]=arg_new_points[j];
+                arg_points[3]=mid_point;
+                Crossing result=f->isCrossingWithoutPoints(arg_points);
+                if (result.points_amount!=0)
+                {
+                    //qDebug() << arg_points[0].x << arg_points[0].y << arg_points[1].x << arg_points[1].y << arg_points[2].x << arg_points[2].y << arg_points[3].x << arg_points[3].y;
+                    float length1=f->segmentLength(new_pp[i], mid_point);
+                    float length2=f->segmentLength(new_pp[i+1], mid_point);
+                    mid_point=(length1<length2)?new_pp[i]:new_pp[i+1];
+                    j=4;
+                    break;
+                }
+            }
+        new_pp.remove(new_pp.size()-1);
+
+        grid_path.push_back(new_pp[min_angle_index]);
+        grid_path.push_back(mid_point);
+        grid_path.push_back(new_left);
+        grid_path.push_back(mid_point);
+        grid_path.push_back(new_right);
+        grid_path.push_back(mid_point);
+
+        new_pp.replace(min_angle_index, new_left);
+        new_pp.insert(min_angle_index+1, mid_point);
+        new_pp.insert(min_angle_index+2, new_right);
+    }
+}
+void MainWindow::buildGrid()
+{
+        buildTriangle();
+}
+void MainWindow::setLabel(int time)
+{
+    time_label=new QLabel("Genering time: " + QString::number(time));
+    time_label->setGeometry(0, 0, scene->width(), 30);
+    time_label->setStyleSheet("QLabel {background-color: transparent; color: rgb(150, 150, 150);}");
+    time_label->setAlignment(Qt::AlignCenter);
+    time_label->setFont(QFont("Times", 14));
+    scene->addWidget(time_label);
+}
+
+void MainWindow::sizeChange()
+{
+    int width=scene->width();
+    scene->clear();
+    if (this->sender()==change_size_in_button)
+        width*=2;
+    else if (this->sender()==change_size_dec_button)
+        width/=2;
+    scene->setSceneRect(0, 0, width, width);
+    draw();
+}
+void MainWindow::nextStepButtonClicked()
+{
+    for (int i=0; i<2; i++)
+        if (new_pp.size()>4)
+        {
+            buildTriangle();
+
+            scene->clear();
+            draw();
+        }
+}
+void MainWindow::resetPolygonButtonClicked()
+{
+    run();
+}
+int MainWindow::maxXPointIndex(Point *p)
+{
+    int m_index=0;
+    for (int i=1; i<amount; i++)
+    {
+        if (p[i].x>p[m_index].x)
+            m_index=i;
+    }
+    return m_index;
+}
+int MainWindow::minXPointIndex(Point *p)
+{
+    int m_index=0;
+    for (int i=1; i<amount; i++)
+        if (p[i].x<p[m_index].x)
+            m_index=i;
+    return m_index;
+}
+int MainWindow::maxYPointIndex(Point *p)
+{
+    int m_index=0;
+    for (int i=1; i<amount; i++)
+        if (p[i].y>p[m_index].y)
+            m_index=i;
+    return m_index;
+}
+int MainWindow::minYPointIndex(Point *p)
+{
+    int m_index=0;
+    for (int i=1; i<amount; i++)
+        if (p[i].y<p[m_index].y)
+            m_index=i;
+    return m_index;
+}
+#include "Field.h"
+
+#include <iostream>
+#include <cmath>
+
+#include "QDebug"
+
+Field::Field()
+{
+}
+
+double Field::vectorsAngle(Point *p)
+{
+    double angle=acos(((p[1].x-p[0].x)*(p[3].x-p[2].x)+(p[1].y-p[0].y)*(p[3].y-p[2].y))/(segmentLength(p[0], p[1])*segmentLength(p[3], p[2])))/(atan(1.0)*4)*180;
+    return ((p[1].x-p[0].x)*(p[3].y-p[2].y)-(p[1].y-p[0].y)*(p[3].x-p[2].x))<0?360-angle:angle;
+}
+double Field::segmentLength(Point p1, Point p2)
+{
+    return sqrt(pow(p2.x-p1.x, 2)+pow(p2.y-p1.y, 2));
+}
+Point Field::middlePoint(Point p1, Point p2)
+{
+    return Point((p1.x+p2.x)/2, (p1.y+p2.y)/2);
+}
+
+Crossing Field::isCrossing(Point *pp)
+{
+    double x1=pp[0].x;
+    double x2=pp[1].x;
+    double x3=pp[2].x;
+    double x4=pp[3].x;
+    double y1=pp[0].y;
+    double y2=pp[1].y;
+    double y3=pp[2].y;
+    double y4=pp[3].y;
+    Crossing result;
+
+    int check228=0;
+    Point1 p;
+
+    if((x1==x2) && (x3!=x4)){
+        p.x=x1;
+        p.y=p.x*(y4-y3)/(x4-x3)+y3-x3*(y4-y3)/(x4-x3);
+        double a, b, c, d, e, f;
+        a = fabs(p.y-y1);
+        b = fabs(y2-p.y);
+        e = fabs(y2-y1);
+        c=sqrt(pow((p.x-x3),2)+pow((p.y-y3),2));
+        d=sqrt(pow((p.x-x4),2)+pow((p.y-y4),2));
+        f=sqrt(pow((x4-x3),2)+pow((y4-y3),2));
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+                check228++;
+            }
+    }
+    if((x1!=x2)&&(x3==x4)){
+        p.x=x3;
+        p.y=p.x*(y2-y1)/(x2-x1)+y1-x1*(y2-y1)/(x2-x1);
+        double a, b, c, d, e, f;
+        a = fabs(p.y-y3);
+        b = fabs(y4-p.y);
+        e = fabs(y4-y3);
+        c=sqrt(pow((p.x-x1),2)+pow((p.y-y1),2));
+        d=sqrt(pow((p.x-x2),2)+pow((p.y-y2),2));
+        f=sqrt(pow((x2-x1),2)+pow((y2-y1),2));
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+                    check228++;
+            }
+    }
+    if((x1==x2)&&(x1==x3)&&(x1==x4)){
+        double a, b, c, d;
+        a=fabs(y2-y1);
+        b=fabs(y4-y3);
+        c=fabs(max(max(y1,y2),max(y3,y4))-min(min(y1,y2),min(y3,y4)));
+        d=a+b-c;
+            if(d > 0){
+                check228++;
+                    p.l = d;
+                    p.x=x1;
+                    p.xx=x1;
+                    p.y=max(min(y1,y2),min(y3,y4));
+                    p.yy=min(max(y1,y2),max(y3,y4));
+            }
+            if(d == 0){
+                check228++;
+                if((y1==y3) || (y1==y4)){
+                    p.x=x1;
+                    p.y=y1;
+                }
+                if((y2==y3) || (y2==y4)){
+                   p.x=x2;
+                   p.y=y2;
+                }
+            }
+            if(d < 0){
+
+            }
+    }
+    if((x1!=x2)&&(x3!=x4)){
+        double a, b, c, d, e, f, l;
+        double k1, k2, b1, b2;
+        k1=(y2-y1)/(x2-x1);
+        k2=(y4-y3)/(x4-x3);
+        b1=y1-x1*(y2-y1)/(x2-x1);
+        b2=y3-x3*(y4-y3)/(x4-x3);
+        if((k1==k2)&&(b1!=b2)){
+
+            }
+        if((k1==k2)&&(b1==b2)){
+            a=fabs(x2-x1);
+            b=fabs(x4-x3);
+            c=fabs(max(max(x1,x2),max(x3,x4))-min(min(x1,x2),min(x3,x4)));
+            d=a+b-c;
+            l=sqrt(pow(d,2)+pow((min(max(y1,y2),max(y3,y4))-max(min(y1,y2),min(y3,y4))),2));
+                if(d > 0){
+                    check228++;
+                    if(k1 < 0){
+                        p.x=max(min(x1,x2),min(x3,x4));
+                        p.xx=min(max(x1,x2),max(x3,x4));
+                        p.y=min(max(y1,y2),max(y3,y4));
+                        p.yy=max(min(y1,y2),min(y3,y4));
+                    }
+                        else{
+                                p.x=max(min(x1,x2),min(x3,x4));
+                                p.xx=min(max(x1,x2),max(x3,x4));
+                                p.y=max(min(y1,y2),min(y3,y4));
+                                p.yy=min(max(y1,y2),max(y3,y4));
+                            }
+                    p.l = l;
+            }
+            if(d == 0){
+            check228++;
+                if((y1==y3) || (y1==y4)){
+                    p.x=x1;
+                    p.y=y1;
+                }
+                if((y2==y3) || (y2==y4)){
+                   p.x=x2;
+                   p.y=y2;
+                }
+            }
+            if(d < 0){
+
+            }
+    }
+        if(k1!=k2){
+            p.x=(b2-b1)/(k1-k2);
+            p.y=p.x*(y2-y1)/(x2-x1)+y1-x1*(y2-y1)/(x2-x1);
+            a = fabs(p.x-x1);
+            b = fabs(p.x-x2);
+            e = fabs(x2-x1);
+            c=fabs(p.x-x3);
+            d=fabs(p.x-x4);
+            f=fabs(x4-x3);
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+               check228++;
+            }
+        }
+    }
+    result.points_amount=check228>0?1:0;
+    return result;
+}
+Crossing Field::isCrossingWithoutPoints(Point *pp)
+{
+    double x1=pp[0].x;
+    double x2=pp[1].x;
+    double x3=pp[2].x;
+    double x4=pp[3].x;
+    double y1=pp[0].y;
+    double y2=pp[1].y;
+    double y3=pp[2].y;
+    double y4=pp[3].y;
+    Crossing result;
+
+    int check228=0;
+    Point1 p;
+
+    if((x1==x2) && (x3!=x4)){
+        p.x=x1;
+        p.y=p.x*(y4-y3)/(x4-x3)+y3-x3*(y4-y3)/(x4-x3);
+        double a, b, c, d, e, f;
+        a = fabs(p.y-y1);
+        b = fabs(y2-p.y);
+        e = fabs(y2-y1);
+        c=sqrt(pow((p.x-x3),2)+pow((p.y-y3),2));
+        d=sqrt(pow((p.x-x4),2)+pow((p.y-y4),2));
+        f=sqrt(pow((x4-x3),2)+pow((y4-y3),2));
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+                check228++;
+            }
+    }
+    if((x1!=x2)&&(x3==x4)){
+        p.x=x3;
+        p.y=p.x*(y2-y1)/(x2-x1)+y1-x1*(y2-y1)/(x2-x1);
+        double a, b, c, d, e, f;
+        a = fabs(p.y-y3);
+        b = fabs(y4-p.y);
+        e = fabs(y4-y3);
+        c=sqrt(pow((p.x-x1),2)+pow((p.y-y1),2));
+        d=sqrt(pow((p.x-x2),2)+pow((p.y-y2),2));
+        f=sqrt(pow((x2-x1),2)+pow((y2-y1),2));
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+                    check228++;
+            }
+    }
+    if((x1==x2)&&(x1==x3)&&(x1==x4)){
+        double a, b, c, d;
+        a=fabs(y2-y1);
+        b=fabs(y4-y3);
+        c=fabs(max(max(y1,y2),max(y3,y4))-min(min(y1,y2),min(y3,y4)));
+        d=a+b-c;
+            if(d > 0){
+                check228++;
+                    p.l = d;
+                    p.x=x1;
+                    p.xx=x1;
+                    p.y=max(min(y1,y2),min(y3,y4));
+                    p.yy=min(max(y1,y2),max(y3,y4));
+            }
+            if(d == 0){
+                check228++;
+                if((y1==y3) || (y1==y4)){
+                    p.x=x1;
+                    p.y=y1;
+                }
+                if((y2==y3) || (y2==y4)){
+                   p.x=x2;
+                   p.y=y2;
+                }
+            }
+            if(d < 0){
+
+            }
+    }
+    if((x1!=x2)&&(x3!=x4)){
+        double a, b, c, d, e, f, l;
+        double k1, k2, b1, b2;
+        k1=(y2-y1)/(x2-x1);
+        k2=(y4-y3)/(x4-x3);
+        b1=y1-x1*(y2-y1)/(x2-x1);
+        b2=y3-x3*(y4-y3)/(x4-x3);
+        if((k1==k2)&&(b1!=b2)){
+
+            }
+        if((k1==k2)&&(b1==b2)){
+            a=fabs(x2-x1);
+            b=fabs(x4-x3);
+            c=fabs(max(max(x1,x2),max(x3,x4))-min(min(x1,x2),min(x3,x4)));
+            d=a+b-c;
+            l=sqrt(pow(d,2)+pow((min(max(y1,y2),max(y3,y4))-max(min(y1,y2),min(y3,y4))),2));
+                if(d > 0){
+                    check228++;
+                    if(k1 < 0){
+                        p.x=max(min(x1,x2),min(x3,x4));
+                        p.xx=min(max(x1,x2),max(x3,x4));
+                        p.y=min(max(y1,y2),max(y3,y4));
+                        p.yy=max(min(y1,y2),min(y3,y4));
+                    }
+                        else{
+                                p.x=max(min(x1,x2),min(x3,x4));
+                                p.xx=min(max(x1,x2),max(x3,x4));
+                                p.y=max(min(y1,y2),min(y3,y4));
+                                p.yy=min(max(y1,y2),max(y3,y4));
+                            }
+                    p.l = l;
+            }
+            if(d == 0){
+            check228++;
+                if((y1==y3) || (y1==y4)){
+                    p.x=x1;
+                    p.y=y1;
+                }
+                if((y2==y3) || (y2==y4)){
+                   p.x=x2;
+                   p.y=y2;
+                }
+            }
+            if(d < 0){
+
+            }
+    }
+        if(k1!=k2){
+            p.x=(b2-b1)/(k1-k2);
+            p.y=p.x*(y2-y1)/(x2-x1)+y1-x1*(y2-y1)/(x2-x1);
+            a = fabs(p.x-x1);
+            b = fabs(p.x-x2);
+            e = fabs(x2-x1);
+            c=fabs(p.x-x3);
+            d=fabs(p.x-x4);
+            f=fabs(x4-x3);
+            if((a > e) || (b > e) || (c > f) || ( d > f)){
+
+            }
+            else{
+               check228++;
+            }
+        }
+    }
+    result.points_amount=check228>0?1:0;
+    if ((p.x==x1 && p.y==y1) || (p.x==x2 && p.y==y2) || (p.x==x3 && p.y==y3) || (p.x==x4 && p.y==y4))
+        result.points_amount=0;
+    return result;
+}
+
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+#include "qDebug"
+
+#include <typeinfo>
+
+using std::ios;
+
+#define mainMenuWidth 180
+#define mainMenuHeight 530
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);    
+
+    body=new Body("My page");
+
+    scene_width=900;
+    scene_height=600;
+
+    setWindowTitle(tr("Web Editor"));
+    setMinimumSize(15+scene_width+mainMenuWidth+40, 15+15+((scene_height>mainMenuHeight)?scene_height:mainMenuHeight));
+    setGeometry(0, 0, 15+scene_width+mainMenuWidth+40, 15+15+((scene_height>mainMenuHeight)?scene_height:mainMenuHeight));
+
+    QRect window_start_pos=this->frameGeometry();
+    window_start_pos.moveCenter(QDesktopWidget().availableGeometry().center());
+    move(window_start_pos.topLeft());
+
+    view=new QGraphicsView(this);
+    view->setGeometry(15, 15, scene_width+19, scene_height);
+
+    screen_size=QPoint(QApplication::desktop()->screenGeometry().width(), QApplication::desktop()->screenGeometry().height()*0.89);
+    body_field=new Scene_body(QPoint(scene_width, scene_height), screen_size, body);
+    body_field->setSceneRect(0, 0, scene_width, scene_height);
+
+    body_field->setBackgroundBrush(QColor(body->bgcolor.getR(), body->bgcolor.getG(), body->bgcolor.getB(), body->bgcolor.getA()*255));
+    view->setScene(body_field);
+    view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    view->centerOn(0, 0);
+
+    ui->mainMenu->setGeometry(scene_width+30+15, 0, mainMenuWidth, mainMenuHeight);
+
+    setActions();
+    setButtons();
+    setOutput();
+    setDialogWindows();
+}
+MainWindow::~MainWindow()
+{
+    body->index.close();
+    body->style.close();
+}
+
+void MainWindow::setActions()
+{
+    connect(body_field, SIGNAL(rectSelectedSignal()), this, SLOT(rectSelectedSlot()));
+    connect(body_field, SIGNAL(rectUnselectedSignal()), this, SLOT(rectUnselectedSlot()));
+    connect(body_field, SIGNAL(rightClickSignal(QPoint)), this, SLOT(rightClickSlot(QPoint)));
+
+
+    saveOutputAction=new QAction(tr("Save all"), this);
+    saveOutputAction->setShortcut(tr("Ctrl+S"));
+    connect(saveOutputAction, SIGNAL(triggered(bool)), this, SLOT(saveOutputSlot()));
+    addAction(saveOutputAction);
+
+    removeElementAction=new QAction(tr("Remove"), this);
+    removeElementAction->setShortcut(tr("Del"));
+    connect(removeElementAction, SIGNAL(triggered(bool)), this, SLOT(removeElementSlot()));
+    addAction(removeElementAction);
+
+    setElementOnCenterAction=new QAction(tr("Align on center"), this);
+    connect(setElementOnCenterAction, SIGNAL(triggered(bool)), this, SLOT(setElementOnCenterSlot()));
+
+    editTextAction=new QAction(tr("Edit text"), this);
+    connect(editTextAction, SIGNAL(triggered(bool)), this, SLOT(editTextSlot()));
+
+    setImageAction=new QAction(tr("Set Image"), this);
+    connect(setImageAction, SIGNAL(triggered(bool)), this, SLOT(setImageSlot()));
+}
+void MainWindow::setButtons()
+{
+    contextMenu=new QMenu("Context menu", this);
+
+    ui->colorRedSlider->setRange(0, 255);
+    ui->colorGreenSlider->setRange(0, 255);
+    ui->colorBlueSlider->setRange(0, 255);
+    ui->colorAlphaSlider->setRange(0, 255);
+    setColorSliders(QPoint(0, 0), QColor(255, 255, 255, 255), 0);
+    setButtonsActive(0);
+}
+void MainWindow::setButtonsActive(bool active)
+{
+    ui->widthSpinBox->setEnabled(active);
+    ui->heightSpinBox->setEnabled(active);
+    ui->backgroundColorRB->setEnabled(active);
+    ui->borderColorRB->setEnabled(active);
+    ui->borderWidthSpinBox->setEnabled(active);
+    ui->colorRedSlider->setEnabled(active);
+    ui->colorGreenSlider->setEnabled(active);
+    ui->colorBlueSlider->setEnabled(active);
+    ui->colorAlphaSlider->setEnabled(active);
+}
+void MainWindow::setOutput()
+{
+    body->index.open(body->getPageName()+".html", ios::trunc | ios::out | ios::in);
+    body->style.open(body->getPageName()+".css", ios::trunc | ios::out | ios::in);
+    if (!body->index || !body->style)
+    {
+        return;
+    }
+    body->index << "<html>\n<head>\n<title>" << body->getPageName() << "</title>\n<link rel='stylesheet' href='" << body->getPageName() << ".css'>\n</head>\n<body>\n";
+    body->style << *body;
+}
+void MainWindow::setDialogWindows()
+{
+    textEditDialog=new QDialog();
+    textEditDialog->setMinimumSize(430+40, 270+15);
+
+    paragraphEdit=new QTextEdit(textEditDialog);
+    paragraphEdit->setGeometry(15, 40, 300, 200);
+
+    fontSizeEdit=new QSpinBox(textEditDialog);
+    fontSizeEdit->setMinimumSize(50, 30);
+    fontSizeEdit->setAlignment(Qt::AlignCenter);
+
+    layout1=new QHBoxLayout();
+    layout1->addWidget(paragraphEdit);
+    layout1->insertSpacing(1, 15);
+    layout1->addWidget(fontSizeEdit);
+    layout1->insertSpacing(3, 10);
+    layout1->setAlignment(fontSizeEdit, Qt::AlignTop);
+
+    layout_main=new QGridLayout(textEditDialog);
+    layout_main->addLayout(layout1, 0, 0);
+
+    connect(paragraphEdit, SIGNAL(textChanged()), this, SLOT(paragraphChangedSlot()));
+    connect(textEditDialog, SIGNAL(rejected()), this, SLOT(editDialogClosedSlot()));
+    connect(fontSizeEdit, SIGNAL(valueChanged(int)), this, SLOT(fontSizeChangedSlot(int)));
+}
+
+void MainWindow::saveOutputSlot()
+{
+    body->index.close();
+    body->style.close();
+    body->index.open(body->getPageName()+".html", ios::out | ios::in);
+    body->style.open(body->getPageName()+".css", ios::out | ios::in);
+    body->index.seekg(0, ios::end);
+    body->style.seekg(0, ios::end);
+}
+
+void MainWindow::rectSelectedSlot()
+{
+    if (ui->backgroundColorRB->isChecked())
+        setColorSliders(body_field->getRectSelected()->getSize(), body_field->getRectSelected()->getBgColor(), body_field->getRectSelected()->getPenSize());
+    else if (ui->borderColorRB->isChecked())
+        setColorSliders(body_field->getRectSelected()->getSize(), body_field->getRectSelected()->getPenColor(), body_field->getRectSelected()->getPenSize());
+    setButtonsActive(1);
+}
+void MainWindow::rectUnselectedSlot()
+{
+    setButtonsActive(0);
+}
+
+void MainWindow::setColorSliders(QPoint s, QColor c, int width)
+{
+    ui->widthSpinBox->setValue(getSizeToPercentsX(s.x()));
+    ui->heightSpinBox->setValue(getSizeToPercentsY(s.y()));
+    color_r=c.red();
+    color_g=c.green();
+    color_b=c.blue();
+    color_a=c.alpha();
+    ui->colorRedSlider->setValue(color_r);
+    ui->colorGreenSlider->setValue(color_g);
+    ui->colorBlueSlider->setValue(color_b);
+    ui->colorAlphaSlider->setValue(color_a);
+    ui->borderWidthSpinBox->setValue(width);
+}
+
+void MainWindow::on_addDivButton_clicked()
+{
+    addNewElement(Div_name);
+}
+void MainWindow::on_addTextButton_clicked()
+{
+    addNewElement(Text_name);
+}
+void MainWindow::on_addImageButton_clicked()
+{
+    addNewElement(Image_name);
+}
+void MainWindow::addNewElement(Element_name name)
+{
+    body->newElement(name, body->index, body->style);
+    div_elem_ptr=dynamic_cast <Div*> (body->elem[body->getGenerId()-1]);
+
+    Rect *rect=new Rect();
+
+    rect->setThisId(body->getGenerId()-1);
+    rect->setPos(getSizeFromHtmlX(div_elem_ptr->getPosx()),
+                 getSizeFromHtmlY(div_elem_ptr->getPosy()));
+    rect->setRectPos(QPoint(0, 0));
+    rect->setSize(QPoint(getSizeFromPercentsX(div_elem_ptr->getWidth()),
+                  getSizeFromPercentsY(div_elem_ptr->getHeight())));
+    rect->setBgColor(QColor(div_elem_ptr->bgcolor.getR(), div_elem_ptr->bgcolor.getG(), div_elem_ptr->bgcolor.getB(), div_elem_ptr->bgcolor.getA()*255));
+    rect->setPenSize(div_elem_ptr->getBorderWidth());
+    rect->setPenColor(QColor(div_elem_ptr->border_color.getR(), div_elem_ptr->border_color.getG(), div_elem_ptr->border_color.getB(), div_elem_ptr->border_color.getA()*255));
+
+    switch (name)
+    {
+        case Div_name:
+        break;
+        case Text_name:
+            text_elem_ptr=dynamic_cast <Text*> (body->elem[body->getGenerId()-1]);
+        break;
+        case Image_name:
+            image_elem_ptr=dynamic_cast <Image*> (body->elem[body->getGenerId()-1]);
+        break;
+    }
+    body_field->addItem(rect);
+}
+
+void MainWindow::rightClickSlot(QPoint pos)
+{
+    contextMenu->clear();
+    contextMenu->addAction(saveOutputAction);
+    if (body_field->getRectSelected())
+    {
+        contextMenu->addSeparator();
+        contextMenu->addAction(removeElementAction);
+        contextMenu->addAction(setElementOnCenterAction);
+        if (typeid(*(body->elem[body_field->getIdSelected()]))==typeid(Text))
+        {
+            text_elem_ptr=dynamic_cast <Text*> (body->elem[body_field->getIdSelected()]);
+            contextMenu->addAction(editTextAction);
+        }
+        else if (typeid(*(body->elem[body_field->getIdSelected()]))==typeid(Image))
+        {
+            image_elem_ptr=dynamic_cast <Image*> (body->elem[body_field->getIdSelected()]);
+            contextMenu->addAction(setImageAction);
+        }
+    }
+    contextMenu->exec(mapToGlobal(QPoint(pos.x()+14, pos.y()+14)));
+}
+
+void MainWindow::removeElementSlot()
+{
+    if (body_field->getRectSelected() && body_field->getRectSelected()->getMode()!=4)
+    {
+        body->deleteElement(body->index, body->style, body_field->getIdSelected());
+
+        body_field->removeItem(body_field->getRectSelected());
+        body_field->update();
+
+        body_field->setRectSelectedToNull();
+        setButtonsActive(0);
+    }
+}
+void MainWindow::setElementOnCenterSlot()
+{
+    if (body_field->getRectSelected())
+    {
+        div_elem_ptr=dynamic_cast <Div*> (body->elem[body_field->getIdSelected()]);
+        div_elem_ptr->setPositionCenter(0);
+        body->resetDiv(body->style, body_field->getIdSelected());
+
+        body_field->getRectSelected()->setPos(QPoint((scene_width-body_field->getRectSelected()->getSize().x())/2, body_field->getRectSelected()->pos().y()));
+        body_field->update();
+    }
+}
+void MainWindow::editTextSlot()
+{
+    fontSizeEdit->setValue(getSizeFromHtmlX(text_elem_ptr->getFontSize()));
+    paragraphEdit->setText(body_field->getRectSelected()->getParagraph());
+    textEditDialog->exec();
+}
+void MainWindow::setImageSlot()
+{
+    QString file_name=QFileDialog::getOpenFileName(this);
+    body_field->getRectSelected()->setImageSrc(file_name);
+    body_field->update();
+
+    image_elem_ptr->setImageUrl(file_name.toStdString());
+    body->resetDiv(body->style, body_field->getIdSelected());
+}
+void MainWindow::paragraphChangedSlot()
+{
+    if (!paragraphEdit->toPlainText().isNull())
+    {
+        body_field->getRectSelected()->setParagraph(paragraphEdit->toPlainText());
+        body_field->getRectSelected()->setFontSize(getSizeFromHtmlX(text_elem_ptr->getFontSize()));
+        body_field->getRectSelected()->setFontColor(QColor(text_elem_ptr->color.getR(), text_elem_ptr->color.getG(),
+                                                           text_elem_ptr->color.getB(), text_elem_ptr->color.getA()*255));
+        body_field->getRectSelected()->update();
+    }
+}
+void MainWindow::editDialogClosedSlot()
+{
+    if (!paragraphEdit->toPlainText().isNull())
+    {
+        body->editText(body->index, body_field->getIdSelected(), paragraphEdit->toPlainText().toStdString());
+        body->resetDiv(body->style, body_field->getIdSelected());
+    }
+}
+void MainWindow::fontSizeChangedSlot(int value)
+{
+    body_field->getRectSelected()->setFontSize(value);
+    body_field->getRectSelected()->update();
+    body_field->update();
+
+    text_elem_ptr->setFontSize(getBorderSizeToHtml(value));
+    body->resetDiv(body->style, body_field->getIdSelected());
+}
+
+
+void MainWindow::on_widthSpinBox_valueChanged(int width)
+{
+    if (body_field->getRectSelected())
+    {
+        div_elem_ptr=dynamic_cast <Div*> (body->elem[body_field->getIdSelected()]);
+        div_elem_ptr->setSize(width, div_elem_ptr->getHeight());
+        body->resetDiv(body->style, body_field->getIdSelected());
+
+        body_field->getRectSelected()->setSize(QPoint(getSizeFromPercentsX(width), body_field->getRectSelected()->getSize().y()));
+        if (!div_elem_ptr->getPositionCenter())
+            body_field->getRectSelected()->setPos(QPoint((scene_width-body_field->getRectSelected()->getSize().x())/2, body_field->getRectSelected()->pos().y()));
+        body_field->getRectSelected()->update();
+        body_field->update();
+    }
+}
+void MainWindow::on_heightSpinBox_valueChanged(int height)
+{
+    if (body_field->getRectSelected())
+    {
+        div_elem_ptr=dynamic_cast <Div*> (body->elem[body_field->getIdSelected()]);
+        div_elem_ptr->setSize(div_elem_ptr->getWidth(), height);
+        body->resetDiv(body->style, body_field->getIdSelected());
+        body_field->getRectSelected()->setSize(QPoint(body_field->getRectSelected()->getSize().x(), getSizeFromPercentsY(height)));
+        body_field->getRectSelected()->update();
+        body_field->update();
+    }
+}
+
+void MainWindow::on_backgroundColorRB_clicked(bool checked)
+{
+    if (checked)
+    {
+        if (body_field->getRectSelected())
+            setColorSliders(body_field->getRectSelected()->getSize(), body_field->getRectSelected()->getBgColor(), body_field->getRectSelected()->getPenSize());
+    }
+}
+void MainWindow::on_borderColorRB_clicked(bool checked)
+{
+    if (checked)
+    {
+        if (body_field->getRectSelected())
+            setColorSliders(body_field->getRectSelected()->getSize(), body_field->getRectSelected()->getPenColor(), body_field->getRectSelected()->getPenSize());
+    }
+}
+void MainWindow::on_borderWidthSpinBox_valueChanged(int width)
+{
+    if (body_field->getRectSelected())
+    {
+        div_elem_ptr=dynamic_cast <Div*> (body->elem[body_field->getIdSelected()]);
+        div_elem_ptr->setBorderWidth(getBorderSizeToHtml(width));
+        body->resetDiv(body->style, body_field->getIdSelected());
+        body_field->getRectSelected()->setPenSize(width);
+        setRectBorderEditing(1);
+    }
+}
+void MainWindow::on_borderWidthSpinBox_editingFinished()
+{
+    setRectBorderEditing(0);
+}
+
+void MainWindow::on_colorRedSlider_sliderPressed()
+{
+    setRectBorderEditing(1);
+}
+void MainWindow::on_colorGreenSlider_sliderPressed()
+{
+    setRectBorderEditing(1);
+}
+void MainWindow::on_colorBlueSlider_sliderPressed()
+{
+    setRectBorderEditing(1);
+}
+void MainWindow::on_colorAlphaSlider_sliderPressed()
+{
+    setRectBorderEditing(1);
+}
+void MainWindow::on_colorRedSlider_sliderReleased()
+{
+    setRectBorderEditing(0);
+}
+void MainWindow::on_colorGreenSlider_sliderReleased()
+{
+    setRectBorderEditing(0);
+}
+void MainWindow::on_colorBlueSlider_sliderReleased()
+{
+    setRectBorderEditing(0);
+}
+void MainWindow::on_colorAlphaSlider_sliderReleased()
+{
+    setRectBorderEditing(0);
+}
+void MainWindow::setRectBorderEditing(bool pressed)
+{
+    if (body_field->getRectSelected())
+    {
+        int m=pressed?5:1;
+        body_field->getRectSelected()->setMode(m);
+        body_field->getRectSelected()->update();
+        body_field->update();
+    }
+}
+
+void MainWindow::on_colorRedSlider_valueChanged(int position)
+{
+    color_r=position;
+    colorSliderMoved();
+}
+void MainWindow::on_colorGreenSlider_valueChanged(int position)
+{
+    color_g=position;
+    colorSliderMoved();
+}
+void MainWindow::on_colorBlueSlider_valueChanged(int position)
+{
+    color_b=position;
+    colorSliderMoved();
+}
+void MainWindow::on_colorAlphaSlider_valueChanged(int position)
+{
+    color_a=position;
+    colorSliderMoved();
+}
+void MainWindow::colorSliderMoved()
+{
+    if (body_field->getRectSelected())
+    {
+        div_elem_ptr=dynamic_cast <Div*> (body->elem[body_field->getIdSelected()]);
+        if (ui->backgroundColorRB->isChecked())
+        {
+            div_elem_ptr->bgcolor.setRGBA(color_r, color_g, color_b, float(color_a)/255);
+            body_field->getRectSelected()->setBgColor(QColor(color_r, color_g, color_b, color_a));   
+        }
+        else if (ui->borderColorRB->isChecked())
+        {
+            div_elem_ptr->border_color.setRGBA(color_r, color_g, color_b, float(color_a)/255);
+            body_field->getRectSelected()->setPenColor(QColor(color_r, color_g, color_b, color_a));
+        }
+        body->resetDiv(body->style, body_field->getIdSelected());
+        body_field->getRectSelected()->update();
+    }
+}
+
+int MainWindow::getSizeToPercentsX(int x) const
+{
+    return qRound(float(x)*100/scene_width);
+}
+int MainWindow::getSizeToPercentsY(int y) const
+{
+    return qRound(float(y)*100/scene_height);
+}
+int MainWindow::getSizeFromPercentsX(int x) const
+{
+    return x*scene_width/100;
+}
+int MainWindow::getSizeFromPercentsY(int y) const
+{
+    return y*scene_height/100;
+}
+int MainWindow::getBorderSizeToHtml(int x) const
+{
+    return x*screen_size.x()/scene_width;
+}
+int MainWindow::getSizeFromHtmlX(int x) const
+{
+    return qRound(float(x)*scene_width/screen_size.x());
+}
+int MainWindow::getSizeFromHtmlY(int y) const
+{
+    return qRound(float(y)*scene_height/screen_size.y());
+}
+
