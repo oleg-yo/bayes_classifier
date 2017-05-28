@@ -1,6 +1,6 @@
 ### **Message classifier**
 
-*Algorithm learns with input dataset and then determines the class of test message.*
+Algorithm learns with input dataset and then determines the class of test message.
 
 ---
 
